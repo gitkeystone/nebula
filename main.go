@@ -17,12 +17,8 @@ package main
 
 import (
 	"github.com/gitkeystone/nebula/cmd"
-	"github.com/gitkeystone/nebula/logger"
 )
 
 func main() {
-	_ = logger.GetLogger()
-	defer logger.Sync() // 确保刷新日志缓冲区
-
 	cmd.Execute()
 }

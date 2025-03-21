@@ -24,6 +24,10 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 			syscall.CLONE_NEWNET | syscall.CLONE_NEWIPC,
 	}
 
+	syscall.Mount("none", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
+
+	cmd.Dir = "/root/busybox"
+
 	if tty {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout

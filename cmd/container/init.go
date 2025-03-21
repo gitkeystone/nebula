@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -44,10 +45,44 @@ func readUserCommand() []string {
 }
 
 func setUpMount() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		log.Error("Get current location error %v", zap.Error(err))
+		return
+	}
 
-	// Mount proc
-	syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
+	log.Info("Current location", zap.String("location", pwd))
+
+	pivotRoot(pwd)
 
 	defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
 	syscall.Mount("proc", "/proc", "proc", uintptr(defaultMountFlags), "")
+
+	syscall.Mount("tmpfs", "/dev", "tmpfs", syscall.MS_NOSUID|syscall.MS_STRICTATIME, "mode=755")
+}
+
+func pivotRoot(newroot string) error {
+	if err := syscall.Mount(newroot, newroot, "bind", syscall.MS_BIND|syscall.MS_REC, ""); err != nil {
+		return fmt.Errorf("Mount rootfs to itself error: %v", err)
+	}
+
+	putold := filepath.Join(newroot, ".pivot_root")
+	if err := os.MkdirAll(putold, 0777); err != nil {
+		return err
+	}
+
+	if err := syscall.PivotRoot(newroot, putold); err != nil {
+		return fmt.Errorf("pivot_root %v", err)
+	}
+
+	if err := os.Chdir("/"); err != nil {
+		return fmt.Errorf("chdir / %v", err)
+	}
+
+	putold = "/.pivot_root"
+	if err := syscall.Unmount(putold, syscall.MNT_DETACH); err != nil {
+		return fmt.Errorf("unmount pivot_root dir %v", err)
+	}
+
+	return os.Remove(putold)
 }
